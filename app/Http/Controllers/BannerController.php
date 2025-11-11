@@ -56,7 +56,6 @@ class BannerController extends Controller
                 'button_text' => 'required|string|max:255',
                 'button_link' => 'required|string|max:255',
                 'order' => 'nullable|integer',
-                'image' => ['required', 'image', 'max:2048'],
             ]);
             $validated['is_active'] = $request->boolean('is_active', true);
 
@@ -88,7 +87,6 @@ class BannerController extends Controller
                 'button_text' => 'required|string|max:255',
                 'button_link' => 'required|string|max:255',
                 'order' => 'nullable|integer',
-                'image' => ['required', 'image', 'max:2048'],
             ]);
 
             $banner->update($validated);
