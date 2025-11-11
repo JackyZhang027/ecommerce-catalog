@@ -61,7 +61,7 @@ export default function Index({ products, filters }: Props) {
         <AppLayout
             title="Products"
             breadcrumbs={[
-                { title: "Home", href: route("dashboard") },
+                { title: "Home", href: route("admin.home") },
                 { title: "Products", href: route("products.index") },
             ]}
         >
