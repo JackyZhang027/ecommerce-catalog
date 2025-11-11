@@ -49,22 +49,26 @@ class BannerController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'subtitle' => 'required|string|max:255',
-            'button_text' => 'required|string|max:255',
-            'button_link' => 'required|string|max:255',
-            'order' => 'nullable|integer',
-            'image' => ['required', 'image', 'max:2048'],
-        ]);
-        $validated['is_active'] = $request->boolean('is_active', true);
+        try {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'subtitle' => 'required|string|max:255',
+                'button_text' => 'required|string|max:255',
+                'button_link' => 'required|string|max:255',
+                'order' => 'nullable|integer',
+                'image' => ['required', 'image', 'max:2048'],
+            ]);
+            $validated['is_active'] = $request->boolean('is_active', true);
 
-        $banner = Banner::create($validated);
+            $banner = Banner::create($validated);
 
-        // ✅ Attach a single image (replaces any previous)
-        if ($request->hasFile('image')) {
-            $banner->addMediaFromRequest('image')->toMediaCollection('banner_image');
-        }
+            // ✅ Attach a single image (replaces any previous)
+            if ($request->hasFile('image')) {
+                $banner->addMediaFromRequest('image')->toMediaCollection('banner_image');
+            }
+        } catch (\Exception $e) {
+            return back()->with('error', 'An error occurred while updating the banner: ' . $e->getMessage());
+        }   
         return redirect()->route('banners.edit', $banner->id)->with('success', 'Banner created successfully');
     }
 
