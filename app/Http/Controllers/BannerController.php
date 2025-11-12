@@ -104,7 +104,6 @@ class BannerController extends Controller
 
     public function destroy(Banner $banner)
     {
-        dd();
         $banner->delete();
 
         return back()->with('success', 'Banner deleted successfully.');

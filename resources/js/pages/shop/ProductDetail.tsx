@@ -5,16 +5,12 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export default function ProductDetail() {
-    const { product, header, footer, setting } = usePage<{
+    const { product, header, footer, shared } = usePage<{
         product: any;
-        header: any;
-        footer: any;
-        setting?: {
-            whatsapp_number?: string;
-            whatsapp_message_template?: string;
-        };
+        shared: any;
     }>().props;
 
+    const setting = shared.setting || {};
     const images = product.media.length>0 ? product.media?.map((m: any) => m.original_url) : ["/assets/images/placeholder.jpg"];
 
     const [mainImageIndex, setMainImageIndex] = useState(0);

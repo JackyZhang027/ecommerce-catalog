@@ -6,17 +6,18 @@ import { useState } from "react";
 import FilterBar from "@/components/ecommerce/FilterBar";
 
 export default function ShopPage() {
-    const { products, categories, setting, filters, header, footer } = usePage<{
+    const { shared, products, categories, filters } = usePage<{
+        shared: any;
         products: {
             data: any[];
             links: any[];
         };
         categories: any[];
         filters: any;
-        header: any;
-        footer: any;
-        setting?: { whatsapp_number?: string; whatsapp_message_template?: string };
     }>().props;
+    
+    const setting = shared.setting || {};
+    const footer = shared.footer || {};
 
     const [search, setSearch] = useState(filters?.search ?? "");
     const [category, setCategory] = useState(filters?.category ?? "");

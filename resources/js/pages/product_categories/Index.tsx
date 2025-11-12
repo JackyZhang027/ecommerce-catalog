@@ -59,6 +59,7 @@ export default function Index({ categories, filters }: Props) {
         baseIndexRoute={route("categories.index")}
         createPage={route('categories.create')}
         editPage="categories"
+        deleteRoute={route('categories.destroy', ':id')}
       />
     </AppLayout>
   );

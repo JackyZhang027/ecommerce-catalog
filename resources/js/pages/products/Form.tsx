@@ -225,11 +225,15 @@ export default function ProductForm({ product, categories }: Props) {
 
                             <div>
                                 <Label htmlFor="category_id">Category</Label>
-                                <select value={String(data.category_id ?? "")} onChange={(e) => setData("category_id", Number(e.target.value))} className="block w-full border rounded px-2 py-1">
+                                <select
+                                    value={String(data.category_id ?? "")}
+                                    onChange={(e) => setData("category_id", Number(e.target.value))}
+                                    className="block w-full border rounded px-2 py-1 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
+                                    >
                                     <option value="">Select category</option>
                                     {categories.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.name}
+                                        <option key={c.id} value={c.id} className="bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+                                        {c.name}
                                         </option>
                                     ))}
                                 </select>

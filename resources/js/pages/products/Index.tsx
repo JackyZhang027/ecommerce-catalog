@@ -17,7 +17,16 @@ interface Props {
 export default function Index({ products, filters }: Props) {
     const columns: ColumnDef<Product>[] = [
         { accessorKey: "name", header: "Name" },
-        { accessorKey: "description", header: "Description" },
+        {
+            accessorKey: "description",
+            header: "Description",
+            cell: ({ row }) => {
+                const value = row.description || "";
+                const truncated =
+                    value.length > 50 ? value.substring(0, 50) + "..." : value;
+                return <span title={value}>{truncated}</span>;
+            },
+        },
         {
             accessorKey: "price",
             header: "Price",
@@ -75,6 +84,7 @@ export default function Index({ products, filters }: Props) {
                 columns={columns}
                 baseIndexRoute={route("products.index")}
                 createPage={route('products.create')}
+                deleteRoute={route('products.destroy', ':id')}
                 editPage="products"
             />
         </AppLayout>

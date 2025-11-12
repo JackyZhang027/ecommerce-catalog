@@ -13,6 +13,7 @@ interface Props {
 export default function CrudDeleteDialog({ open, onClose, deleteRoute, record }: Props) {
   const handleDelete = () => {
     if (!record) return;
+    debugger;
     deleteRoute = deleteRoute.replace(':id', record.id)
     router.delete(`${deleteRoute}`, {
       onSuccess: onClose,

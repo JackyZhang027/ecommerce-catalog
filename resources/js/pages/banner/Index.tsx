@@ -62,6 +62,7 @@ export default function Index({ banners, filters }: Props) {
         baseIndexRoute={route("banners.index")}
         createPage={route('banners.create')}
         editPage="banners"
+        deleteRoute={route("banners.destroy", ":id")}
       />
     </AppLayout>
   );
