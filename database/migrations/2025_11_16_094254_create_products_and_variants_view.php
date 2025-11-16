@@ -8,6 +8,7 @@ return new class extends Migration
     {
         DB::statement("
         CREATE VIEW products_and_variants AS
+            -- PRODUCTS WITHOUT VARIANT
             SELECT 
                 'product' AS type,
                 p.id AS product_id,
@@ -17,13 +18,15 @@ return new class extends Migration
                 p.price,
                 p.stock,
                 p.is_active,
-                c.name as category_name
+                p.category_id,
+                c.name AS category_name
             FROM products p
             LEFT JOIN product_categories c ON c.id = p.category_id
             WHERE p.is_active = 1 AND p.has_variant = 0
 
-            UNION ALL
+        UNION ALL
 
+            -- VARIANTS
             SELECT 
                 'variant' AS type,
                 pv.product_id,
@@ -33,7 +36,8 @@ return new class extends Migration
                 COALESCE(pv.discount_price, pv.price) AS price,
                 pv.stock,
                 pv.is_active,
-                c.name as category_name
+                p.category_id,
+                c.name AS category_name
             FROM product_variants pv
             JOIN products p ON p.id = pv.product_id
             JOIN product_categories c ON c.id = p.category_id
