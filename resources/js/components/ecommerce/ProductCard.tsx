@@ -20,6 +20,10 @@ export default function ProductCard({
   image,
   setting,
 }: ProductCardProps) {
+const formattedPrice = Number(price).toLocaleString("id-ID", {
+  minimumFractionDigits: 0,
+});
+
   const phoneNumber = setting?.whatsapp_number ?? "6280000000000";
   const template =
     setting?.whatsapp_message_template ??
@@ -29,7 +33,7 @@ export default function ProductCard({
     e.stopPropagation(); // ⛔ prevent card click
     const message = template
       .replace("{product_name}", name)
-      .replace("{product_price}", price.toLocaleString());
+      .replace("{product_price}", formattedPrice);
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   };
@@ -58,7 +62,7 @@ export default function ProductCard({
       <div className="p-3 sm:p-4 flex flex-col">
         <h3 className="font-medium text-gray-800 text-sm sm:text-base truncate">{name}</h3>
         <p className="text-blue-600 font-semibold text-base sm:text-lg mt-1">
-          Rp {price.toLocaleString("id-ID", { minimumFractionDigits: 0 })}
+          Rp {formattedPrice}
         </p>
 
         <button
