@@ -14,6 +14,7 @@ use App\Http\Controllers\MediaFolderController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductInventoryController;
 use App\Http\Controllers\FloatingContactController;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\ShopController;
@@ -68,6 +69,14 @@ Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function 
     Route::put('/banners/{banner}/toggle', [BannerController::class, 'toggleActive'])
         ->name('banners.toggle');
     Route::resource('banners', BannerController::class);
+
+    // Product Inventory Routes
+    Route::get('/inventory', [ProductInventoryController::class, 'index'])
+        ->name('inventory.index');
+
+    // update price / stock (product or variant)
+    Route::put('inventory/{id}', [ProductInventoryController::class, 'update'])
+        ->name('inventory.update');
 });
 
 // Shop Routes
