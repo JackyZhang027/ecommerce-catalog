@@ -12,6 +12,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\SettingAppController;
 use App\Http\Controllers\MediaFolderController;
 use App\Http\Controllers\ProductCategoryController;
+use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\FloatingContactController;
 use App\Http\Controllers\BannerController;
@@ -47,6 +48,9 @@ Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function 
     Route::delete('categories/{category}/media', [ProductCategoryController::class, 'destroyMedia'])
         ->name('categories.media.destroy');
     Route::resource('categories', ProductCategoryController::class);
+
+    // Attributes Routes
+    Route::resource('attributes', AttributeController::class);
 
     // Product Routes
     Route::put('/products/{product}/toggle', [ProductController::class, 'toggleActive'])

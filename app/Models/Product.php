@@ -19,6 +19,7 @@ class Product extends Model implements HasMedia
         'price',
         'stock',
         'category_id',
+        'has_variant',
         'is_active',
     ];
 
@@ -38,6 +39,11 @@ class Product extends Model implements HasMedia
     public function category()
     {
         return $this->belongsTo(ProductCategory::class);
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
     }
 
     public function getFirstImageUrlAttribute()

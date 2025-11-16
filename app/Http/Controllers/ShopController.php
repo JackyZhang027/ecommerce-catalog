@@ -84,11 +84,42 @@ class ShopController extends Controller
 
     public function show($slug)
     {
-        $product = Product::with('media', 'category')->where('slug', $slug)->firstOrFail();
         
+        $product = Product::with([
+            'category',
+            'media',                    // product images
+            'variants.media',           // variant images
+            'variants.variantValues.attribute',
+            'variants.variantValues.attributeValue',
+        ])->where('slug', $slug)->firstOrFail();
+        
+        // Build variant label (example: “Red M”)
+        $product->variants->transform(function ($variant) {
+            $labelParts = [];
+
+            foreach ($variant->variantValues as $vv) {
+                $labelParts[] = $vv->attributeValue->value;
+            }
+
+            $variant->label = implode(' ', $labelParts);
+            $variant->images = $variant->media->map(fn($m) => $m->original_url);
+
+            return $variant;
+        });
+
+        // product images
+        $product->images = $product->media->map(fn($m) => $m->original_url);
+
+
         return Inertia::render('shop/ProductDetail', [
-            'product'   => $product,
+            'product'     => $product,
         ]);
+
+        // $product = Product::with('media', 'category')->where('slug', $slug)->firstOrFail();
+        
+        // return Inertia::render('shop/ProductDetail', [
+        //     'product'   => $product,
+        // ]);
     }
 
     public function category($slug)

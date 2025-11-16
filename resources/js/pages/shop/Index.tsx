@@ -141,15 +141,15 @@ function ProductCard({ product }: { product: Product }) {
         {hasDiscount ? (
             <>
             <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                Rp. {product.discount_price!.toLocaleString("id-ID", { minimumFractionDigits: 2 })}
+                Rp. {product.discount_price!.toLocaleString("id-ID", { minimumFractionDigits: 0 })}
             </span>
             <span className="text-sm text-gray-400 line-through">
-                Rp. {product.price.toLocaleString("id-ID", { minimumFractionDigits: 2 })}
+                Rp. {product.price.toLocaleString("id-ID", { minimumFractionDigits: 0 })}
             </span>
             </>
         ) : (
             <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            Rp. {product.price.toLocaleString("id-ID", { minimumFractionDigits: 2 })}
+            Rp. {product.price.toLocaleString("id-ID", { minimumFractionDigits: 0 })}
             </span>
         )}
         </div>

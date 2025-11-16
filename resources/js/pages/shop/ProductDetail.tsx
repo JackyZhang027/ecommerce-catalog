@@ -5,171 +5,221 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export default function ProductDetail() {
-    const { product, header, footer, shared } = usePage<{
-        product: any;
-        shared: any;
-    }>().props;
+    const { product, shared } = usePage<any>().props;
+    const setting = shared.setting;
 
-    const setting = shared.setting || {};
-    const images = product.media.length>0 ? product.media?.map((m: any) => m.original_url) : ["/assets/images/placeholder.jpg"];
+    const [activeVariant, setActiveVariant] = useState<any>(null);
+    const [mainIndex, setMainIndex] = useState(0);
+    const [zoomImage, setZoomImage] = useState<string | null>(null);
 
-    const [mainImageIndex, setMainImageIndex] = useState(0);
-    const [touchStartX, setTouchStartX] = useState<number | null>(null);
-    const [touchEndX, setTouchEndX] = useState<number | null>(null);
+    // IMAGES:
+    // Prefer variant images → fallback to product images
+    const images =
+        activeVariant && activeVariant.images?.length > 0
+            ? activeVariant.images
+            : product.images;
 
-    const minSwipeDistance = 50;
+    const displayPrice = activeVariant ? activeVariant.price : product.price;
+    const displayStock = (() => {
+        if (product.variants.length === 0) {
+            // No variants → use product stock
+            return product.stock;
+        }
 
-    const onTouchStart = (e: React.TouchEvent) => {
-        setTouchEndX(null);
-        setTouchStartX(e.targetTouches[0].clientX);
-    };
-
-    const onTouchMove = (e: React.TouchEvent) => {
-        setTouchEndX(e.targetTouches[0].clientX);
-    };
-
-    const onTouchEnd = () => {
-        if (!touchStartX || !touchEndX) return;
-        const distance = touchStartX - touchEndX;
-        if (Math.abs(distance) < minSwipeDistance) return;
-        if (distance > 0) {
-            // swipe left
-            setMainImageIndex((prev) =>
-                prev + 1 < images.length ? prev + 1 : 0
-            );
-        } else {
-            // swipe right
-            setMainImageIndex((prev) =>
-                prev - 1 >= 0 ? prev - 1 : images.length - 1
+        if (!activeVariant) {
+            // Has variants but none selected → sum all variant stock
+            return product.variants.reduce(
+                (total: number, v: any) => total + (v.stock || 0),
+                0
             );
         }
-    };
 
-    const mainImage = images[mainImageIndex];
+        // Variant selected → use variant stock
+        return activeVariant.stock;
+    })();
 
-    // ✅ WhatsApp Buy Now handler
-    const phoneNumber = setting?.whatsapp_number ?? "6280000000000";
+
+    // WhatsApp
+    const phone = setting.whatsapp_number;
     const template =
-        setting?.whatsapp_message_template ??
-        "Hello, I'm interested in buying *{product_name}* (Price: Rp {product_price}).";
+        setting.whatsapp_message_template ??
+        "I'm interested in {product_name} (Price: Rp {product_price})";
 
     const handleBuyNow = () => {
-        const message = template
-            .replace("{product_name}", product.name)
-            .replace("{product_price}", parseInt(product.price).toLocaleString());
-        const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-            message
-        )}`;
-        window.open(url, "_blank");
+        const variantName = activeVariant ? ` (${activeVariant.label})` : "";
+        const price = activeVariant ? activeVariant.price : product.price;
+
+        const msg = template
+            .replace("{product_name}", product.name + variantName)
+            .replace("{product_price}", parseInt(price).toLocaleString());
+
+        window.open(
+            `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,
+            "_blank"
+        );
     };
+
+    const handleVariantClick = (variant: any) => {
+        // If user clicks the same variant again → reset
+        if (activeVariant?.id === variant.id) {
+            setActiveVariant(null);
+            setMainIndex(0);
+            return;
+        }
+
+        // Otherwise select the new variant
+        setActiveVariant(variant);
+        setMainIndex(0);
+    };
+
 
     return (
         <div className="min-h-screen flex flex-col bg-white">
             <Head title={product.name} />
-            <Header header={header} setting={setting} />
+            <Header header={shared.header} setting={setting} />
 
             <main className="flex-grow w-full py-10 px-4 sm:px-6 lg:px-12">
-                <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 md:gap-14">
-                    {/* LEFT — IMAGE GALLERY */}
-                    <div>
-                        <div
-                            onTouchStart={onTouchStart}
-                            onTouchMove={onTouchMove}
-                            onTouchEnd={onTouchEnd}
-                            className="aspect-square rounded-2xl overflow-hidden bg-gray-100 relative"
-                        >
-                            <img
-                                src={mainImage}
-                                alt={product.name}
-                                className="w-full h-full object-cover transition-transform duration-300"
-                            />
+                <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10">
+                    
+                    {/* ---------- IMAGE GALLERY ---------- */}
+                    <div className="flex gap-4">
 
-                            {/* Dots indicator (mobile only) */}
-                            {images.length > 1 && (
-                                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 md:hidden">
-                                    {images.map((_, i) => (
-                                        <span
-                                            key={i}
-                                            className={`w-2.5 h-2.5 rounded-full transition ${i === mainImageIndex
-                                                    ? "bg-blue-600"
-                                                    : "bg-gray-300"
-                                                }`}
-                                        />
-                                    ))}
-                                </div>
-                            )}
+                        {/* LEFT THUMBNAILS (Desktop Only) */}
+                        <div
+                            className="hidden md:flex flex-col gap-3"
+                            style={{ maxHeight: "480px" }}
+                        >
+                            {images.map((img: string, i: number) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setMainIndex(i)}
+                                    className={`w-20 h-20 rounded-xl border overflow-hidden ${
+                                        i === mainIndex
+                                            ? "border-blue-600"
+                                            : "border-gray-300"
+                                    }`}
+                                >
+                                    <img
+                                        src={img}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </button>
+                            ))}
                         </div>
 
-                        {/* Thumbnails (desktop only) */}
-                        {images.length > 1 && (
-                            <div className="hidden md:flex flex-wrap gap-3 mt-4">
+                        {/* MAIN IMAGE */}
+                        <div className="relative w-full">
+                            <div
+                                className="rounded-xl overflow-hidden bg-gray-100"
+                                style={{ height: "480px" }}
+                            >
+                                <img
+                                    src={images[mainIndex]}
+                                    className="w-full h-full object-cover cursor-pointer"
+                                    onClick={() => setZoomImage(images[mainIndex])}
+                                />
+                            </div>
+
+                            {/* Zoom Icon */}
+                            <button
+                                onClick={() => setZoomImage(images[mainIndex])}
+                                className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full cursor-pointer"
+                            >
+                                🔍
+                            </button>
+
+                            {/* MOBILE THUMBNAILS */}
+                            <div className="flex md:hidden gap-3 mt-4 overflow-x-auto">
                                 {images.map((img: string, i: number) => (
                                     <button
                                         key={i}
-                                        onClick={() => setMainImageIndex(i)}
-                                        className={`w-24 h-24 rounded-xl overflow-hidden border-2 transition-all duration-200 ${mainImage === img
-                                                ? "border-blue-600 ring-2 ring-blue-200"
-                                                : "border-gray-200 hover:border-gray-400"
-                                            }`}
+                                        onClick={() => setMainIndex(i)}
+                                        className={`w-20 h-20 rounded-xl border overflow-hidden ${
+                                            i === mainIndex
+                                                ? "border-blue-600"
+                                                : "border-gray-300"
+                                        }`}
                                     >
                                         <img
                                             src={img}
-                                            alt=""
-                                            className="object-cover w-full h-full"
+                                            className="w-full h-full object-cover"
                                         />
                                     </button>
                                 ))}
                             </div>
-                        )}
+                        </div>
                     </div>
 
-                    {/* RIGHT — PRODUCT INFO */}
-                    <div className="flex flex-col justify-between">
-                        <div>
-                            <h1 className="text-4xl font-bold text-gray-900 leading-tight">
-                                {product.name}
-                            </h1>
+                    {/* ---------- PRODUCT INFO ---------- */}
+                    <div>
+                        <h1 className="text-3xl font-bold">{product.name}</h1>
 
-                            <p className="text-gray-500 mt-2 text-sm">
-                                Category:{" "}
-                                <span className="font-medium text-gray-700">
-                                    {product.category?.name ?? "Uncategorized"}
-                                </span>
-                            </p>
+                        <p className="text-2xl text-blue-600 font-semibold mt-3">
+                            Rp {parseInt(displayPrice).toLocaleString("id-ID")}
+                        </p>
 
-                            <p className="text-3xl font-semibold text-blue-600 mt-4">
-                                Rp {parseInt(product.price).toLocaleString("id-ID")}
-                            </p>
+                        <p className="mt-2">
+                            Stock:{" "}
+                            {displayStock > 0
+                                ? `${displayStock} pcs`
+                                : "Out of stock"}
+                        </p>
+                        <p className="mt-2">
+                            {product.description}
+                        </p>
 
-                            <div className="mt-6 text-gray-700 leading-relaxed whitespace-pre-line">
-                                {product.description}
+                        {/* VARIANT LIST */}
+                        {product.variants.length > 0 && (
+                            <div className="mt-6">
+                                <p className="font-medium mb-2">
+                                    Available Variants:
+                                </p>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {product.variants.map((v: any) => (
+                                        <button
+                                            key={v.id}
+                                            onClick={() => handleVariantClick(v)}
+                                            className={`px-4 py-2 rounded-lg border ${
+                                                activeVariant?.id === v.id
+                                                    ? "bg-blue-600 text-white border-blue-600"
+                                                    : "bg-gray-100 text-gray-700 border-gray-300"
+                                            }`}
+                                        >
+                                            {v.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
+                        )}
 
-                            <ul className="mt-6 space-y-2 text-sm text-gray-600 border-t border-gray-200 pt-4">
-                                <li>
-                                    <span className="font-medium text-gray-800">Stock:</span>{" "}
-                                    {product.stock > 0
-                                        ? `${product.stock} pcs`
-                                        : "Out of stock"}
-                                </li>
-                            </ul>
-                            {/* ACTION BUTTONS */}
-                            <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                                <Button
-                                    size="lg"
-                                    onClick={handleBuyNow}
-                                    className="bg-green-600 hover:bg-green-700 text-white flex-1 py-6 text-base font-medium rounded-xl shadow-md hover:shadow-green-200"
-                                >
-                                    Chat on WhatsApp
-                                </Button>
-                            </div>
+                        {/* BUY NOW / WHATSAPP */}
+                        <div className="mt-8">
+                            <Button
+                                className="bg-green-600 text-white w-full py-4 rounded-xl"
+                                onClick={handleBuyNow}
+                            >
+                                Chat on WhatsApp
+                            </Button>
                         </div>
-
                     </div>
                 </div>
             </main>
 
-            <Footer footer={footer} />
+            <Footer footer={shared.footer} />
+
+            {/* ---------- ZOOM MODAL ---------- */}
+            {zoomImage && (
+                <div
+                    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 cursor-zoom-out"
+                    onClick={() => setZoomImage(null)}
+                >
+                    <img
+                        src={zoomImage}
+                        className="max-w-[100%] max-h-[100%] rounded-xl shadow-lg"
+                    />
+                </div>
+            )}
         </div>
     );
 }

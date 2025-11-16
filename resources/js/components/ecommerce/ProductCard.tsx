@@ -58,7 +58,7 @@ export default function ProductCard({
       <div className="p-3 sm:p-4 flex flex-col">
         <h3 className="font-medium text-gray-800 text-sm sm:text-base truncate">{name}</h3>
         <p className="text-blue-600 font-semibold text-base sm:text-lg mt-1">
-          Rp {price.toLocaleString()}
+          Rp {price.toLocaleString("id-ID", { minimumFractionDigits: 0 })}
         </p>
 
         <button
