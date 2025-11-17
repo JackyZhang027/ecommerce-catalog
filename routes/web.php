@@ -48,7 +48,9 @@ Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function 
         
     Route::delete('categories/{category}/media', [ProductCategoryController::class, 'destroyMedia'])
         ->name('categories.media.destroy');
-    Route::resource('categories', ProductCategoryController::class);
+    Route::resource('categories', ProductCategoryController::class)->except(['update']);
+    Route::post('categories/{category}', [ProductCategoryController::class, 'update'])->name('categories.update');
+
 
     // Attributes Routes
     Route::resource('attributes', AttributeController::class);
@@ -58,7 +60,8 @@ Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function 
         ->name('products.toggle');
     Route::delete('/products/{product}/media/{media}', [ProductController::class, 'deleteMedia'])
         ->name('products.media.delete');
-    Route::resource('products', ProductController::class);
+    Route::resource('products', ProductController::class)->except(['update']);
+    Route::post('products/{product}', [ProductController::class, 'update'])->name('products.update');
     
     // Floating Contact Routes
     Route::put('/floating_contacts/{floating_contact}/toggle', [FloatingContactController::class, 'toggleActive'])

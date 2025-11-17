@@ -112,7 +112,7 @@ export default function Header() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearch}
-              className="bg-transparent text-sm px-3 py-1 focus:outline-none w-48 xl:w-64"
+              className="bg-transparent text-sm px-3 py-1 focus:outline-none w-48 xl:w-64 text-gray-800"
             />
             {searchQuery && (
               <button

@@ -50,7 +50,6 @@ class ShopController extends Controller
 
     public function shop(Request $request)
     {
-        $setting = SettingApp::first();
         $query = Product::query()->with(['category', 'media'])->where('is_active', true);
         // Filters
         if ($request->search) {
@@ -77,6 +76,7 @@ class ShopController extends Controller
                 'search' => $request->get('search', ''),
                 'category' => $request->get('category', ''),
                 'sort' => $request->get('sort', ''),
+                'page' => $request->get('page', ''),
             ],
         ]);
 

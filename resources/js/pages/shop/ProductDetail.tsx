@@ -152,26 +152,26 @@ export default function ProductDetail() {
 
                     {/* ---------- PRODUCT INFO ---------- */}
                     <div>
-                        <h1 className="text-3xl font-bold">{product.name}</h1>
+                        <h1 className="text-3xl font-bold text-black">{product.name}</h1>
 
                         <p className="text-2xl text-blue-600 font-semibold mt-3">
                             Rp {parseInt(displayPrice).toLocaleString("id-ID")}
                         </p>
 
-                        <p className="mt-2">
+                        <p className="mt-2 text-sm text-gray-600">
                             Stock:{" "}
                             {displayStock > 0
                                 ? `${displayStock} pcs`
                                 : "Out of stock"}
                         </p>
-                        <p className="mt-2">
+                        <p className="mt-2 text-gray-700 whitespace-pre-line">
                             {product.description}
                         </p>
 
                         {/* VARIANT LIST */}
                         {product.variants.length > 0 && (
                             <div className="mt-6">
-                                <p className="font-medium mb-2">
+                                <p className="font-medium mb-2 text-gray-800">
                                     Available Variants:
                                 </p>
 
@@ -180,10 +180,10 @@ export default function ProductDetail() {
                                         <button
                                             key={v.id}
                                             onClick={() => handleVariantClick(v)}
-                                            className={`px-4 py-2 rounded-lg border ${
+                                            className={`px-4 py-2 rounded-lg border cursor-pointer ${
                                                 activeVariant?.id === v.id
                                                     ? "bg-blue-600 text-white border-blue-600"
-                                                    : "bg-gray-100 text-gray-700 border-gray-300"
+                                                    : "bg-gray-100 text-gray-800 border-gray-300"
                                             }`}
                                         >
                                             {v.label}
@@ -196,7 +196,7 @@ export default function ProductDetail() {
                         {/* BUY NOW / WHATSAPP */}
                         <div className="mt-8">
                             <Button
-                                className="bg-green-600 text-white w-full py-4 rounded-xl"
+                                className="bg-green-600 text-white w-full py-4 rounded-xl cursor-pointer"
                                 onClick={handleBuyNow}
                             >
                                 Chat on WhatsApp

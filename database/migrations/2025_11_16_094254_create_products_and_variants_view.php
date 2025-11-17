@@ -31,7 +31,7 @@ return new class extends Migration
                 'variant' AS type,
                 pv.product_id,
                 pv.id AS variant_id,
-                pv.name AS name,
+                CONCAT(p.name, ' - ', pv.name) AS name,
                 pv.sku,
                 COALESCE(pv.discount_price, pv.price) AS price,
                 pv.stock,
