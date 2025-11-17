@@ -66,7 +66,7 @@ class ShopController extends Controller
             $query->orderBy('price', 'desc');
         }
 
-        $products = $query->paginate(12)->withQueryString();
+        $products = $query->paginate(10)->withQueryString();
         $categories = ProductCategory::where('is_active', true)->get();
 
         return Inertia::render('shop/Shop', [
