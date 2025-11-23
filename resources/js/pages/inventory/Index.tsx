@@ -64,7 +64,7 @@ export default function InventoryIndex({ items, filters, categories }) {
                     />
 
                     <select
-                        className="border p-2 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                        className="border p-2 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 bg-background"
                         value={category}
                         onChange={e => setCategory(e.target.value)}
                     >

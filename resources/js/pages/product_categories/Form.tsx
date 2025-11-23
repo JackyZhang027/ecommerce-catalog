@@ -174,7 +174,7 @@ export default function ProductCategoryForm({ category, categories }) {
                                                         : null
                                                 )
                                             }
-                                            className="block w-full border rounded px-2 py-1"
+                                            className="block w-full border rounded px-2 py-1 bg-background"
                                         >
                                             <option value="">None</option>
                                             {categories.map((c) => (

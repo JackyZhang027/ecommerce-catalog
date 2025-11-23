@@ -101,7 +101,7 @@ export default function MenuForm({ menu, parentMenus, permissions }: MenuFormPro
                     onChange={(e) =>
                       setData('parent_id', e.target.value === '' ? null : Number(e.target.value))
                     }
-                    className="w-full rounded border px-3 py-2"
+                    className="w-full rounded border px-3 py-2 bg-background"
                   >
                     <option value="">— None —</option>
                     {parentMenus.map((m) => (

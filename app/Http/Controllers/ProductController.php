@@ -18,14 +18,20 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query();
+        $query = Product::with(['category', 'media']); // FIX: Eager load to prevent N+1 queries
 
         if ($search = $request->input('search')) {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%"); // FIX: Usually users want to search description too
+            });
         }
 
-        if ($sort = $request->input('sort')) {
-            $direction = $request->input('direction', 'asc');
+        $sort = $request->input('sort', 'id');
+        $direction = $request->input('direction', 'desc');
+
+        // Security: Ensure sort column actually exists to prevent SQL injection attempts
+        if (in_array($sort, ['id', 'name', 'price', 'stock', 'created_at'])) {
             $query->orderBy($sort, $direction);
         } else {
             $query->orderBy('id', 'desc');
@@ -51,55 +57,39 @@ class ProductController extends Controller
 
     public function create()
     {
-        $categories = ProductCategory::where('is_active', true)->get();
-        $attributes = Attribute::with('values:id,attribute_id,value')->where('is_active', true)->get(['id', 'name']);
-
-        return Inertia::render('products/Form', 
-            [
-                'categories' => $categories,
-                'attributes' => $attributes
-            ]
-        );
+        return Inertia::render('products/Form', [
+            'categories' => ProductCategory::where('is_active', true)->get(),
+            'attributes' => Attribute::with('values:id,attribute_id,value')->where('is_active', true)->get(['id', 'name']),
+        ]);
     }
 
     public function edit(Product $product)
     {
-        $product->load('media');
-        $categories = ProductCategory::where('is_active', true)->get();
-        $attributes = Attribute::with('values:id,attribute_id,value')->where('is_active', true)->get(['id', 'name']);
+        $product->load(['media', 'variants.media', 'variants.variantValues.attribute', 'variants.variantValues.attributeValue']);
         $images = $product->getMedia('images')->map(fn($m)=> ['id'=>$m->id, 'url'=>$m->getUrl()])->toArray();
-        $variants = $product->variants()
-            ->with([
-                'media',
-                'variantValues.attribute',
-                'variantValues.attributeValue'
-            ])
-            ->get()
-            ->map(function($variant) {
-                return [
-                    'id' => $variant->id,
-                    'name' => $variant->name,
-                    'sku' => $variant->sku,
-                    'price' => $variant->price,
-                    'stock' => $variant->stock,
-                    'is_active' => $variant->is_active,
-                    'images' => $variant->getMedia('variant_images')->map(fn($m)=> [
-                        'id'=>$m->id,
-                        'url'=>$m->getUrl()
-                    ])->toArray(),
-                    'values' => $variant->variantValues->map(function($vv) {
-                        return [
-                            'id' => $vv->id,
-                            'attribute_id' => $vv->attribute_id,
-                            'attribute_name' => $vv->attribute->name ?? null,
-                            'attribute_value_id' => $vv->attribute_value_id,
-                            'attribute_value' => $vv->attributeValue->value ?? null,
-                        ];
-                    })->toArray(),
-                ];
-            });
         
-        
+        $variants = $product->variants->map(function($variant) {
+            return [
+                'id' => $variant->id,
+                'name' => $variant->name,
+                'sku' => $variant->sku,
+                'price' => $variant->price,
+                'stock' => $variant->stock,
+                'is_active' => (bool)$variant->is_active,
+                'images' => $variant->getMedia('variant_images')->map(fn($m)=> ['id'=>$m->id, 'url'=>$m->getUrl()])->toArray(),
+                'values' => $variant->variantValues->map(function($vv) {
+                    return [
+                        'id' => $vv->id,
+                        'attribute_id' => $vv->attribute_id,
+                        'attribute_name' => $vv->attribute->name ?? null,
+                        'attribute_value_id' => $vv->attribute_value_id,
+                        'attribute_value' => $vv->attributeValue->value ?? null,
+                    ];
+                })->toArray(),
+                'existingImages' => $variant->getMedia('variant_images')->map(fn($m)=> ['id'=>$m->id, 'url'=>$m->getUrl()])->toArray(), // Helper for frontend
+            ];
+        });
+
         return inertia('products/Form', [
             'product' => [
                 'id' => $product->id,
@@ -112,216 +102,140 @@ class ProductController extends Controller
                 'images' => $images,
                 'variants' => $variants,
             ],
-            'categories' => $categories,
-            'attributes' => $attributes,
+            'categories' => ProductCategory::where('is_active', true)->get(),
+            'attributes' => Attribute::with('values:id,attribute_id,value')->where('is_active', true)->get(['id', 'name']),
         ]);
-
     }
 
     public function store(Request $request)
     {
-        // Normalize boolean
-        $request->merge([
-            'has_variant' => filter_var($request->input('has_variant'), FILTER_VALIDATE_BOOLEAN)
-        ]);
+        $request->merge(['has_variant' => filter_var($request->input('has_variant'), FILTER_VALIDATE_BOOLEAN)]);
         
-        $validated = $this->validateProduct($request);
-        
+        // Validation now returns validated data
+        $validated = $this->validateProduct($request); 
+
         try {
             $product = DB::transaction(function() use ($request, $validated) {
-                $p = Product::create([
-                    'name' => $validated['name'],
-                    'category_id' => $validated['category_id'],
-                    'description' => $validated['description'] ?? null,
-                    'price' => $validated['price'] ?? 0,
-                    'stock' => $validated['stock'] ?? 0,
-                    'has_variant' => $validated['has_variant'],
-                ]);
-                
-                // Handle product images
+                $p = Product::create($validated); // We can pass $validated directly if keys match fillable
+
                 if ($request->hasFile('images')) {
                     foreach ($request->file('images') as $img) {
-                        $p->addMedia($img)
-                            ->usingFileName(uniqid() . '.' . $img->getClientOriginalExtension())
-                            ->toMediaCollection('images');
+                        $p->addMedia($img)->toMediaCollection('images');
                     }
                 }
-                
-                // Handle variants
-                if ($validated['has_variant'] && !empty($validated['variants'])) {
-                    $this->saveVariants($p, $validated['variants']);
+
+                if ($validated['has_variant'] && !empty($request->input('variants'))) {
+                    // Pass the raw request variants array to handle file uploads correctly
+                    $this->saveVariants($p, $request->input('variants'), $request);
                 }
-                
+
                 return $p;
             });
-            
-            return redirect()
-                ->route('products.edit', ['product' => $product->id])
-                ->with('success', 'Product created successfully');
-                
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
+
+            return redirect()->route('products.edit', $product->id)->with('success', 'Product created successfully');
         } catch (\Exception $e) {
-            \Log::error('Product creation failed: ' . $e->getMessage(), [
-                'exception' => $e,
-                'request' => $request->except(['images', 'variants.*.images'])
-            ]);
-            return back()
-                ->withErrors(['error' => 'Failed to create product: ' . $e->getMessage()])
-                ->withInput();
+            \Log::error('Product creation failed', ['error' => $e->getMessage()]);
+            return back()->withErrors(['error' => 'System error: ' . $e->getMessage()])->withInput();
         }
     }
 
     public function update(Request $request, Product $product)
     {
-        // Normalize boolean
-        $request->merge([
-            'has_variant' => filter_var($request->input('has_variant'), FILTER_VALIDATE_BOOLEAN)
-        ]);
+        // dd();
+        $request->merge(['has_variant' => filter_var($request->input('has_variant'), FILTER_VALIDATE_BOOLEAN)]);
         
         $validated = $this->validateProduct($request, $product->id);
-        
-        try {    
+        try {
             DB::transaction(function() use ($request, $validated, $product) {
-                $product->update([
-                    'name' => $validated['name'],
-                    'category_id' => $validated['category_id'],
-                    'description' => $validated['description'] ?? null,
-                    'price' => $validated['price'] ?? 0,
-                    'stock' => $validated['stock'] ?? 0,
-                    'has_variant' => $validated['has_variant'],
-                ]);
+                $product->update($validated);
                 
-                // Handle new product images
+
                 if ($request->hasFile('images')) {
+                    
                     foreach ($request->file('images') as $img) {
-                        $product->addMedia($img)
-                            ->usingFileName(uniqid() . '.' . $img->getClientOriginalExtension())
-                            ->toMediaCollection('images');
+                        $product->addMedia($img)->toMediaCollection('images');
                     }
                 }
-                
-                // Handle variants
-                if ($validated['has_variant'] && !empty($validated['variants'])) {
-                    $this->saveVariants($product, $validated['variants']);
+                if ($validated['has_variant']) {
+                    $this->saveVariants($product, $request->input('variants'), $request);
                 } else {
-                    // If has_variant is disabled, delete all variants
-                    $product->variants()->delete();
+                    $product->variants()->delete(); // Soft delete if model uses SoftDeletes, otherwise hard delete
                 }
             });
-            
+
             return back()->with('success', 'Product updated successfully');
-            
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
         } catch (\Exception $e) {
-            \Log::error('Product update failed: ' . $e->getMessage(), [
-                'exception' => $e,
-                'product_id' => $product->id,
-                'request' => $request->except(['images', 'variants.*.images'])
-            ]);
-            return back()
-                ->withErrors(['error' => 'Failed to update product: ' . $e->getMessage()])
-                ->withInput();
+            \Log::error('Product update failed', ['error' => $e->getMessage()]);
+            dd($e);
+            return back()->withErrors(['error' => 'System error: ' . $e->getMessage()])->withInput();
         }
     }
 
-
-    protected function saveVariants(Product $product, $variants)
+    protected function saveVariants(Product $product, array $variantsData, Request $request)
     {
+        // 1. Get IDs of variants currently in DB
         $existingIds = $product->variants()->pluck('id')->toArray();
-        $incomingIds = collect($variants)->pluck('id')->filter()->toArray();
         
-        // Delete removed variants
-        $toDelete = array_diff($existingIds, $incomingIds);
-        if (!empty($toDelete)) {
-            ProductVariant::whereIn('id', $toDelete)->delete();
-        }
-        
-        foreach ($variants as $data) {
-            // UPDATE existing variant
-            if (!empty($data['id'])) {
-                $variant = ProductVariant::find($data['id']);
-                
-                if (!$variant || $variant->product_id !== $product->id) {
-                    continue; // Skip if variant doesn't belong to this product
-                }
-                
-                $variant->update([
+        // 2. Get IDs present in the request
+        $incomingIds = collect($variantsData)->pluck('id')->filter()->toArray();
+
+        // 3. Delete variants that are in DB but NOT in Request
+        $product->variants()->whereIn('id', array_diff($existingIds, $incomingIds))->delete();
+
+        // 4. Loop through request data
+        foreach ($variantsData as $index => $data) {
+            $variant = $product->variants()->updateOrCreate(
+                ['id' => $data['id'] ?? null],
+                [
                     'name' => $data['name'],
                     'sku' => $data['sku'],
                     'price' => $data['price'],
                     'stock' => $data['stock'],
                     'is_active' => $data['is_active'] ?? true,
-                ]);
-            } 
-            // CREATE new variant
-            else {
-                $variant = $product->variants()->create([
-                    'name' => $data['name'],
-                    'sku' => $data['sku'],
-                    'price' => $data['price'],
-                    'stock' => $data['stock'],
-                    'is_active' => $data['is_active'] ?? true,
-                ]);
-            }
-            
-            // Sync attribute values
-            $this->saveVariantAttributes($variant, $data['values'] ?? []);
-            
-            // Sync images
-            $this->saveVariantImages(
-                $variant, 
-                $data['images'] ?? [], 
-                $data['existingImages'] ?? []
+                ]
             );
+
+            // CHANGED: Pass 'attributes' instead of 'values'
+            $this->saveVariantAttributes($variant, $data['attributes'] ?? []);
+
+            // Handle Images
+            if ($request->hasFile("variants.{$index}.images")) {
+                foreach ($request->file("variants.{$index}.images") as $file) {
+                    $variant->addMedia($file)->toMediaCollection('variant_images');
+                }
+            }
         }
     }
 
-    protected function saveVariantAttributes(ProductVariant $variant, $values)
+    protected function saveVariantAttributes(ProductVariant $variant, array $attributes)
     {
-        // Get existing variant values
-        $existing = $variant->variantValues()->pluck('id')->toArray();
-        $incoming = collect($values)->pluck('id')->filter()->map(fn($id) => (int)$id)->toArray();
-        
-        // Delete removed attribute values
-        $toDelete = array_diff($existing, $incoming);
-        if (!empty($toDelete)) {
-            ProductVariantValue::whereIn('id', $toDelete)->delete();
-        }
-        
-        foreach ($values as $val) {
-            // Validate required fields
-            if (empty($val['attribute_id']) || empty($val['attribute_value_id'])) {
-                continue;
-            }
-            
-            // Update existing variant value
-            if (!empty($val['id'])) {
-                $variantValue = ProductVariantValue::find($val['id']);
-                
-                if ($variantValue && $variantValue->product_variant_id === $variant->id) {
-                    $variantValue->update([
-                        'attribute_id' => $val['attribute_id'],
-                        'attribute_value_id' => $val['attribute_value_id'],
-                    ]);
-                }
-            } 
-            // Create new variant value
-            else {
-                // Check for duplicate combination for this variant
-                $exists = ProductVariantValue::where('product_variant_id', $variant->id)
-                    ->where('attribute_id', $val['attribute_id'])
-                    ->where('attribute_value_id', $val['attribute_value_id'])
-                    ->exists();
-                
-                if (!$exists) {
-                    $variant->variantValues()->create([
-                        'attribute_id' => $val['attribute_id'],
-                        'attribute_value_id' => $val['attribute_value_id'],
-                    ]);
-                }
-            }
+        // $attributes comes in as: [ "1" => "5", "2" => "10" ] 
+        // (Key is Attribute ID, Value is Attribute Value ID)
+
+        // 1. Identify incoming Attribute IDs (the keys)
+        $incomingAttributeIds = array_keys($attributes);
+
+        // 2. Delete existing pivot records for Attribute IDs NOT in the request
+        // (e.g. User removed "Color" from this variant but kept "Size")
+        $variant->variantValues()
+            ->whereNotIn('attribute_id', $incomingAttributeIds)
+            ->delete();
+
+        // 3. Update or Create records
+        foreach ($attributes as $attributeId => $attributeValueId) {
+            if (empty($attributeId) || empty($attributeValueId)) continue;
+
+            // We use updateOrCreate based on (variant_id + attribute_id)
+            // because a variant can only have ONE value per attribute type.
+            $variant->variantValues()->updateOrCreate(
+                [
+                    'product_variant_id' => $variant->id,
+                    'attribute_id' => (int) $attributeId
+                ],
+                [
+                    'attribute_value_id' => (int) $attributeValueId
+                ]
+            );
         }
     }
     
@@ -357,112 +271,68 @@ class ProductController extends Controller
 
     private function validateProduct(Request $request, $productId = null)
     {
+        $mediaRules = [
+            'nullable', 
+            'file', 
+            'mimes:jpeg,png,jpg,webp,mp4,mov,avi,webm', // Allowed types
+            'max:51200' // 50MB
+        ];
         
         $rules = [
-            'name' => [
-                'required', 
-                'string', 
-                'max:255',
-                Rule::unique('products', 'name')->ignore($productId)
-            ],
-            'category_id' => [
-                'required', 
-                'integer', 
-                Rule::exists('product_categories', 'id')
-            ],
+            'name' => ['required', 'string', 'max:255', Rule::unique('products')->ignore($productId)],
+            'category_id' => ['required', 'exists:product_categories,id'],
             'description' => ['required', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
             'stock' => ['nullable', 'numeric', 'min:0'],
             'has_variant' => ['required', 'boolean'],
-            'images.*' => ['nullable', 'file', 'image', 'max:5120'], // 5MB max
+            'images.*' => $mediaRules,
         ];
-        
-        // Variant validation rules
+
         if ($request->input('has_variant')) {
             $rules = array_merge($rules, [
                 'variants' => ['required', 'array', 'min:1'],
-                'variants.*.id' => [
-                    'nullable', 
-                    'integer', 
-                    Rule::exists('product_variants', 'id')->where('product_id', $productId)
-                ],
                 'variants.*.name' => ['required', 'string', 'max:255'],
+                'variants.*.price' => ['required', 'numeric', 'min:0'],
+                'variants.*.stock' => ['required', 'numeric', 'min:0'],
+                'variants.*.attributes' => ['required', 'array', 'min:1'],
+                'variants.*.attributes.*' => ['required', 'integer', 'exists:attribute_values,id'],
+
                 'variants.*.sku' => [
-                    'required', 
-                    'string', 
-                    'max:255',
-                    // Custom rule for unique SKU within the request
-                    function ($attribute, $value, $fail) use ($request, $productId) {
-                        // Get the current variant index
-                        preg_match('/variants\.(\d+)\.sku/', $attribute, $matches);
-                        $currentIndex = $matches[1] ?? null;
-                        
-                        // Check uniqueness within request variants
-                        $variants = $request->input('variants', []);
-                        $skuCount = 0;
-                        foreach ($variants as $index => $variant) {
-                            if (isset($variant['sku']) && 
-                                strtolower(trim($variant['sku'])) === strtolower(trim($value))) {
-                                $skuCount++;
-                            }
-                        }
-                        
-                        if ($skuCount > 1) {
-                            $fail('The SKU must be unique across all variants.');
-                            return;
-                        }
-                        
-                        // Check uniqueness in database (exclude current product's variants if editing)
+                    'required', 'string', 'max:255', 'distinct',
+                    function ($attribute, $value, $fail) use ($productId) {
                         $query = ProductVariant::where('sku', $value);
-                        
                         if ($productId) {
-                            // When editing, exclude variants of current product
-                            $query->whereHas('product', function($q) use ($productId) {
-                                $q->where('id', '!=', $productId);
-                            });
-                            
-                            // Also exclude the current variant being edited
-                            $currentVariantId = $variants[$currentIndex]['id'] ?? null;
-                            if ($currentVariantId) {
-                                $query->where('id', '!=', $currentVariantId);
-                            }
+                            $query->where('product_id', '!=', $productId);
                         }
-                        
                         if ($query->exists()) {
-                            $fail('The SKU has already been taken.');
+                            $fail("The SKU '{$value}' is already taken.");
                         }
                     }
                 ],
-                'variants.*.price' => ['required', 'numeric', 'min:0'],
-                'variants.*.stock' => ['required', 'numeric', 'min:0'],
                 'variants.*.images' => ['nullable', 'array'],
-                'variants.*.images.*' => ['nullable', 'file', 'image', 'max:5120'], // 5MB max
-                'variants.*.existingImages' => ['nullable', 'array'],
-                'variants.*.existingImages.*.id' => ['nullable', 'integer'],
-                'variants.*.values' => ['required', 'array', 'min:1'], // At least 1 attribute required
-                'variants.*.values.*.id' => ['nullable', 'integer'],
-                'variants.*.values.*.attribute_id' => [
-                    'required', 
-                    'integer', 
-                    Rule::exists('attributes', 'id')
-                ],
-                'variants.*.values.*.attribute_value_id' => [
-                    'required', 
-                    'integer', 
-                    Rule::exists('attribute_values', 'id')
-                ],
+                'variants.*.images.*' => $mediaRules,
             ]);
         }
-        
-        return $request->validate($rules, [
-            'variants.*.sku.required' => 'SKU is required for all variants.',
-            'variants.*.values.required' => 'Each variant must have at least one attribute.',
-            'variants.*.values.min' => 'Each variant must have at least one attribute.',
-        ]);
+
+        $attributes = [
+            'category_id' => 'category',
+            'variants.*.name' => 'variant name',
+            'variants.*.sku' => 'variant SKU',
+            'variants.*.price' => 'variant price',
+            'variants.*.stock' => 'variant stock',
+            'variants.*.attributes' => 'attributes',
+            'images.*' => 'image'
+        ];
+
+        $messages = [
+            'variants.*.sku.distinct' => 'Duplicate SKU found in list.',
+            'variants.*.attributes.required' => 'Every variant must have at least one attribute.',
+            'variants.*.attributes.min' => 'Every variant must have at least one attribute.',
+            'images.*.max' => 'The image or video must not be greater than 50 megabytes'
+        ];
+
+        return $request->validate($rules, $messages, $attributes);
     }
-
-
-    
     public function destroy(Product $product)
     {
         try {

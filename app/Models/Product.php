@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use App\Models\ProductCategory;
 
 class Product extends Model implements HasMedia
@@ -51,4 +52,11 @@ class Product extends Model implements HasMedia
         return $this->getFirstMediaUrl('images') ?: asset('images/placeholder.png');
     }
 
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+             ->width(368)
+             ->height(232)
+             ->sharpen(10);
+    }
 }
