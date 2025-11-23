@@ -3,41 +3,66 @@ import Header from "@/components/ecommerce/Header";
 import Footer from "@/components/ecommerce/Footer";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { PlayCircle, Image, Maximize } from "lucide-react"; // Import Icons
+
+// Define a type for your media items
+interface MediaItem {
+    url: string;
+    type: 'image' | 'video'; // Assuming your backend provides this type
+}
+
+// Extend existing types (assuming product and variant have a media property now)
+interface ProductProps {
+    product: {
+        id: number;
+        name: string;
+        price: number;
+        stock: number;
+        description: string;
+        images: MediaItem[]; // Updated to MediaItem[]
+        variants: any[];
+    };
+    shared: {
+        setting: {
+            whatsapp_number: string;
+            whatsapp_message_template: string;
+        };
+        // ... other shared data
+    };
+}
 
 export default function ProductDetail() {
-    const { product, shared } = usePage<any>().props;
+    // Cast to the updated type for better type safety
+    const { product, shared } = usePage<ProductProps>().props;
     const setting = shared.setting;
 
     const [activeVariant, setActiveVariant] = useState<any>(null);
     const [mainIndex, setMainIndex] = useState(0);
-    const [zoomImage, setZoomImage] = useState<string | null>(null);
+    const [zoomMedia, setZoomMedia] = useState<MediaItem | null>(null); // Use MediaItem for zoom
 
-    // IMAGES:
-    // Prefer variant images → fallback to product images
-    const images =
+    // IMAGES/MEDIA:
+    // Prefer variant media → fallback to product media
+    const mediaItems: MediaItem[] =
         activeVariant && activeVariant.images?.length > 0
             ? activeVariant.images
             : product.images;
 
     const displayPrice = activeVariant ? activeVariant.price : product.price;
     const displayStock = (() => {
+        // ... (stock calculation remains the same)
         if (product.variants.length === 0) {
-            // No variants → use product stock
             return product.stock;
         }
 
         if (!activeVariant) {
-            // Has variants but none selected → sum all variant stock
             return product.variants.reduce(
                 (total: number, v: any) => total + (v.stock || 0),
                 0
             );
         }
 
-        // Variant selected → use variant stock
         return activeVariant.stock;
     })();
-
 
     // WhatsApp
     const phone = setting.whatsapp_number;
@@ -60,28 +85,75 @@ export default function ProductDetail() {
     };
 
     const handleVariantClick = (variant: any) => {
-        // If user clicks the same variant again → reset
         if (activeVariant?.id === variant.id) {
             setActiveVariant(null);
             setMainIndex(0);
             return;
         }
 
-        // Otherwise select the new variant
         setActiveVariant(variant);
         setMainIndex(0);
     };
+    
+    // Helper function to render the thumbnail content
+    const renderThumbnail = (item: MediaItem) => {
+        if (item.type === 'video') {
+            return (
+                <div className="relative w-full h-full flex items-center justify-center bg-gray-200 cursor-pointer">
+                    {/* Placeholder for video thumbnail, or use a cover image */}
+                    <PlayCircle className="w-8 h-8 text-blue-600 opacity-70" />
+                    <p className="absolute bottom-1 right-1 text-xs text-black/70 font-semibold bg-white/80 px-1 rounded">Video</p>
+                </div>
+            );
+        }
+        return (
+            <img
+                src={item.url}
+                className="w-full h-full object-cover cursor-pointer"
+                alt="Product thumbnail"
+            />
+        );
+    }
+    
+    // Helper function to render the main media content
+    const renderMainMedia = (item: MediaItem) => {
+        if (item.type === 'video') {
+            return (
+                <video
+                    key={item.url} // Key forces re-render when video changes
+                    src={item.url}
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                    className="w-full h-full object-cover"
+                    style={{ maxHeight: "480px" }}
+                >
+                    Your browser does not support the video tag.
+                </video>
+            );
+        }
+        return (
+            <img
+                src={item.url}
+                className="w-full h-full object-cover cursor-pointer"
+                onClick={() => setZoomMedia(item)}
+                alt="Main product media"
+            />
+        );
+    }
 
+    const currentMedia = mediaItems[mainIndex];
 
     return (
         <div className="min-h-screen flex flex-col bg-white">
             <Head title={product.name} />
-            <Header header={shared.header} setting={setting} />
+            <Header />
 
             <main className="flex-grow w-full py-10 px-4 sm:px-6 lg:px-12">
                 <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10">
                     
-                    {/* ---------- IMAGE GALLERY ---------- */}
+                    {/* ---------- IMAGE/VIDEO GALLERY ---------- */}
                     <div className="flex gap-4">
 
                         {/* LEFT THUMBNAILS (Desktop Only) */}
@@ -89,75 +161,65 @@ export default function ProductDetail() {
                             className="hidden md:flex flex-col gap-3"
                             style={{ maxHeight: "480px" }}
                         >
-                            {images.map((img: string, i: number) => (
+                            {mediaItems.map((item: MediaItem, i: number) => (
                                 <button
-                                    key={i}
+                                    key={item.url} // Use URL as key
                                     onClick={() => setMainIndex(i)}
                                     className={`w-20 h-20 rounded-xl border overflow-hidden ${
                                         i === mainIndex
-                                            ? "border-blue-600"
+                                            ? "border-blue-600 ring-2 ring-blue-600"
                                             : "border-gray-300"
-                                    }`}
+                                    } transition-all duration-150`}
                                 >
-                                    <img
-                                        src={img}
-                                        className="w-full h-full object-cover"
-                                    />
+                                    {renderThumbnail(item)}
                                 </button>
                             ))}
                         </div>
 
-                        {/* MAIN IMAGE */}
+                        {/* MAIN MEDIA DISPLAY */}
                         <div className="relative w-full">
                             <div
                                 className="rounded-xl overflow-hidden bg-gray-100"
                                 style={{ height: "480px" }}
                             >
-                                <img
-                                    src={images[mainIndex]}
-                                    className="w-full h-full object-cover cursor-pointer"
-                                    onClick={() => setZoomImage(images[mainIndex])}
-                                />
+                                {currentMedia && renderMainMedia(currentMedia)}
                             </div>
 
-                            {/* Zoom Icon */}
-                            <button
-                                onClick={() => setZoomImage(images[mainIndex])}
-                                className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full cursor-pointer"
-                            >
-                                🔍
-                            </button>
+                            {/* Zoom Icon (Only show for images, or when media is selected) */}
+                            {currentMedia && currentMedia.type === 'image' && (
+                                <button
+                                    onClick={() => setZoomMedia(currentMedia)}
+                                    className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full cursor-pointer hover:bg-black/80 transition"
+                                >
+                                    <Maximize className="w-5 h-5" />
+                                </button>
+                            )}
 
                             {/* MOBILE THUMBNAILS */}
                             <div className="flex md:hidden gap-3 mt-4 overflow-x-auto">
-                                {images.map((img: string, i: number) => (
+                                {mediaItems.map((item: MediaItem, i: number) => (
                                     <button
-                                        key={i}
+                                        key={item.url}
                                         onClick={() => setMainIndex(i)}
-                                        className={`w-20 h-20 rounded-xl border overflow-hidden ${
+                                        className={`w-20 h-20 flex-shrink-0 rounded-xl border overflow-hidden ${
                                             i === mainIndex
-                                                ? "border-blue-600"
+                                                ? "border-blue-600 ring-2 ring-blue-600"
                                                 : "border-gray-300"
-                                        }`}
+                                        } transition-all duration-150`}
                                     >
-                                        <img
-                                            src={img}
-                                            className="w-full h-full object-cover"
-                                        />
+                                        {renderThumbnail(item)}
                                     </button>
                                 ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* ---------- PRODUCT INFO ---------- */}
+                    {/* ---------- PRODUCT INFO (No changes needed here) ---------- */}
                     <div>
                         <h1 className="text-3xl font-bold text-black">{product.name}</h1>
-
                         <p className="text-2xl text-blue-600 font-semibold mt-3">
                             Rp {parseInt(displayPrice).toLocaleString("id-ID")}
                         </p>
-
                         <p className="mt-2 text-sm text-gray-600">
                             Stock:{" "}
                             {displayStock > 0
@@ -174,7 +236,6 @@ export default function ProductDetail() {
                                 <p className="font-medium mb-2 text-gray-800">
                                     Available Variants:
                                 </p>
-
                                 <div className="flex flex-wrap gap-2">
                                     {product.variants.map((v: any) => (
                                         <button
@@ -196,7 +257,7 @@ export default function ProductDetail() {
                         {/* BUY NOW / WHATSAPP */}
                         <div className="mt-8">
                             <Button
-                                className="bg-green-600 text-white w-full py-4 rounded-xl cursor-pointer"
+                                className="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl cursor-pointer"
                                 onClick={handleBuyNow}
                             >
                                 Chat on WhatsApp
@@ -206,18 +267,36 @@ export default function ProductDetail() {
                 </div>
             </main>
 
-            <Footer footer={shared.footer} />
+            <Footer />
 
-            {/* ---------- ZOOM MODAL ---------- */}
-            {zoomImage && (
+            {/* ---------- ZOOM MODAL (Updated to handle video/image) ---------- */}
+            {zoomMedia && (
                 <div
-                    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 cursor-zoom-out"
-                    onClick={() => setZoomImage(null)}
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 cursor-zoom-out p-4"
+                    onClick={() => setZoomMedia(null)}
                 >
-                    <img
-                        src={zoomImage}
-                        className="max-w-[100%] max-h-[100%] rounded-xl shadow-lg"
-                    />
+                    {zoomMedia.type === 'video' ? (
+                         <video
+                            src={zoomMedia.url}
+                            controls
+                            autoPlay
+                            loop
+                            className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-lg"
+                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking video
+                        />
+                    ) : (
+                        <img
+                            src={zoomMedia.url}
+                            className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-lg"
+                            alt="Zoomed product image"
+                        />
+                    )}
+                    <button
+                        className="absolute top-4 right-4 text-white text-2xl font-bold p-2"
+                        onClick={() => setZoomMedia(null)}
+                    >
+                        &times;
+                    </button>
                 </div>
             )}
         </div>

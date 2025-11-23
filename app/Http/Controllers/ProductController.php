@@ -166,7 +166,6 @@ class ProductController extends Controller
             return back()->with('success', 'Product updated successfully');
         } catch (\Exception $e) {
             \Log::error('Product update failed', ['error' => $e->getMessage()]);
-            dd($e);
             return back()->withErrors(['error' => 'System error: ' . $e->getMessage()])->withInput();
         }
     }

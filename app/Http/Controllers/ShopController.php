@@ -84,17 +84,26 @@ class ShopController extends Controller
 
     public function show($slug)
     {
-        
+        // ... (Eager loading remains the same)
         $product = Product::with([
             'category',
-            'media',                    // product images
-            'variants.media',           // variant images
+            'media', 
+            'variants.media', 
             'variants.variantValues.attribute',
             'variants.variantValues.attributeValue',
         ])->where('slug', $slug)->firstOrFail();
         
-        // Build variant label (example: “Red M”)
-        $product->variants->transform(function ($variant) {
+        // Helper function to map Spatie Media to the Frontend structure (URL and Type)
+        $mapMedia = function ($mediaItem) {
+            $type = str_starts_with($mediaItem->mime_type, 'video/') ? 'video' : 'image';
+            return [
+                'url' => $mediaItem->original_url,
+                'type' => $type,
+            ];
+        };
+
+        // Build variant label and map media
+        $product->variants->transform(function ($variant) use ($mapMedia) {
             $labelParts = [];
 
             foreach ($variant->variantValues as $vv) {
@@ -102,24 +111,20 @@ class ShopController extends Controller
             }
 
             $variant->label = implode(' ', $labelParts);
-            $variant->images = $variant->media->map(fn($m) => $m->original_url);
+            
+            // APPLY THE MEDIA MAPPING HERE
+            $variant->images = $variant->media->map($mapMedia); 
 
             return $variant;
         });
 
-        // product images
-        $product->images = $product->media->map(fn($m) => $m->original_url);
+        // APPLY THE MEDIA MAPPING HERE for Product images
+        $product->images = $product->media->map($mapMedia);
 
 
         return Inertia::render('shop/ProductDetail', [
-            'product'     => $product,
+            'product' => $product,
         ]);
-
-        // $product = Product::with('media', 'category')->where('slug', $slug)->firstOrFail();
-        
-        // return Inertia::render('shop/ProductDetail', [
-        //     'product'   => $product,
-        // ]);
     }
 
     public function category($slug)
