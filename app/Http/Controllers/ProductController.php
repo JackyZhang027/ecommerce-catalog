@@ -12,7 +12,7 @@ use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -141,7 +141,6 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        // dd();
         $request->merge(['has_variant' => filter_var($request->input('has_variant'), FILTER_VALIDATE_BOOLEAN)]);
         
         $validated = $this->validateProduct($request, $product->id);
@@ -161,7 +160,12 @@ class ProductController extends Controller
                 } else {
                     $product->variants()->delete(); // Soft delete if model uses SoftDeletes, otherwise hard delete
                 }
+                if($product->getOriginal('name') !== $product->name){
+                    Cache::forget("product_detail_{$product->getOriginal('name')}");
+                }
+                Cache::forget("product_detail_{$product->slug}");
             });
+            
 
             return back()->with('success', 'Product updated successfully');
         } catch (\Exception $e) {

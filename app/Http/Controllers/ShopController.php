@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Cache;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\SettingApp;
 use App\Models\Banner;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
-
-
 
 class ShopController extends Controller
 {
@@ -84,48 +83,54 @@ class ShopController extends Controller
 
     public function show($slug)
     {
-        // ... (Eager loading remains the same)
-        $product = Product::with([
-            'category',
-            'media', 
-            'variants.media', 
-            'variants.variantValues.attribute',
-            'variants.variantValues.attributeValue',
-        ])->where('slug', $slug)->firstOrFail();
-        
-        // Helper function to map Spatie Media to the Frontend structure (URL and Type)
-        $mapMedia = function ($mediaItem) {
-            $type = str_starts_with($mediaItem->mime_type, 'video/') ? 'video' : 'image';
-            return [
-                'url' => $mediaItem->original_url,
-                'type' => $type,
-            ];
-        };
+        // Cache key unique for each product slug
+        $cacheKey = "product_detail_{$slug}";
 
-        // Build variant label and map media
-        $product->variants->transform(function ($variant) use ($mapMedia) {
-            $labelParts = [];
+        // Cache for 24 hour
+        $product = Cache::remember($cacheKey, 60*60*24, function () use ($slug) {
 
-            foreach ($variant->variantValues as $vv) {
-                $labelParts[] = $vv->attributeValue->value;
-            }
-
-            $variant->label = implode(' ', $labelParts);
+            $product = Product::with([
+                'category',
+                'media', 
+                'variants.media', 
+                'variants.variantValues.attribute',
+                'variants.variantValues.attributeValue',
+            ])->where('slug', $slug)->firstOrFail();
             
-            // APPLY THE MEDIA MAPPING HERE
-            $variant->images = $variant->media->map($mapMedia); 
+            // Media mapping helper
+            $mapMedia = function ($mediaItem) {
+                $type = str_starts_with($mediaItem->mime_type, 'video/') ? 'video' : 'image';
+                return [
+                    'url' => $mediaItem->original_url,
+                    'type' => $type,
+                ];
+            };
 
-            return $variant;
+            // Build variant label & map media
+            $product->variants->transform(function ($variant) use ($mapMedia) {
+                $labelParts = [];
+
+                foreach ($variant->variantValues as $vv) {
+                    $labelParts[] = $vv->attributeValue->value;
+                }
+
+                $variant->label = implode(' ', $labelParts);
+                $variant->images = $variant->media->map($mapMedia);
+
+                return $variant;
+            });
+
+            // Map product images
+            $product->images = $product->media->map($mapMedia);
+
+            return $product;
         });
-
-        // APPLY THE MEDIA MAPPING HERE for Product images
-        $product->images = $product->media->map($mapMedia);
-
 
         return Inertia::render('shop/ProductDetail', [
             'product' => $product,
         ]);
     }
+
 
     public function category($slug)
     {
