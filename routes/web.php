@@ -18,6 +18,9 @@ use App\Http\Controllers\ProductInventoryController;
 use App\Http\Controllers\FloatingContactController;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\SaleController;
 
 Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function () {
     Route::get('/', function () {
@@ -80,6 +83,18 @@ Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function 
     // update price / stock (product or variant)
     Route::put('inventory/{id}', [ProductInventoryController::class, 'update'])
         ->name('inventory.update');
+
+    // Suppliers
+    Route::resource('suppliers', SupplierController::class);
+    Route::put('suppliers/{supplier}/toggle', [SupplierController::class, 'toggle'])
+        ->name('suppliers.toggle');
+
+    // Purchases
+    Route::resource('purchases', PurchaseController::class);
+
+    // Sales
+    Route::resource('sales', SaleController::class);
+
 });
 
 // Shop Routes
