@@ -188,7 +188,7 @@ export default function VariantDrawer({
 
                     <div>
                         <Label>Stock</Label>
-                        <Input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
+                        <Input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} disabled/>
                         {errors.stock && <p className="text-xs text-red-500 mt-1">{errors.stock}</p>}
                     </div>
 

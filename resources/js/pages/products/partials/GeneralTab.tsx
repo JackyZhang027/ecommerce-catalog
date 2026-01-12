@@ -81,7 +81,7 @@ export default function GeneralTab({ data, setData, errors, categories }: Props)
                     min="0"
                     value={data.has_variant ? 0 : data.stock}
                     onChange={(e) => setData("stock", parseInt(e.target.value) || 0)}
-                    disabled={data.has_variant}
+                    disabled
                 />
                 {errors.stock && <p className="text-sm text-red-500 mt-1">{errors.stock}</p>}
             </div>

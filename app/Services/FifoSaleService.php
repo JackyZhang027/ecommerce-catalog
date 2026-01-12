@@ -42,6 +42,7 @@ class FifoSaleService
             $saleItem->batches()->create([
                 'stock_batch_id' => $batch->id,
                 'qty' => $take,
+                'cost' => $batch->cost,
             ]);
 
             $remaining -= $take;

@@ -23,6 +23,7 @@ class Product extends Model implements HasMedia
         'has_variant',
         'is_active',
     ];
+    protected $appends = ['stock'];
 
     protected static function booted()
     {
@@ -46,6 +47,28 @@ class Product extends Model implements HasMedia
     {
         return $this->hasMany(ProductVariant::class);
     }
+
+    public function purchaseItems()
+    {
+        return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function saleItems()
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+
+    public function getStockAttribute()
+    {
+        if (($this->variant_count ?? 0) > 0) {
+            return ($this->variant_purchased_qty ?? 0)
+                 - ($this->variant_sold_qty ?? 0);
+        }
+
+        return ($this->product_purchased_qty ?? 0)
+             - ($this->product_sold_qty ?? 0);
+    }
+
 
     public function getFirstImageUrlAttribute()
     {

@@ -21,6 +21,7 @@ use App\Http\Controllers\ShopController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\DashboardController;
 
 Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function () {
     Route::get('/', function () {
@@ -94,6 +95,9 @@ Route::middleware(['auth', 'menu.permission'])->prefix('admin')->group(function 
 
     // Sales
     Route::resource('sales', SaleController::class);
+
+    Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
+
 
 });
 

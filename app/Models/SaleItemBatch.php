@@ -10,6 +10,7 @@ class SaleItemBatch extends Model
         'sale_item_id',
         'stock_batch_id',
         'qty',
+        'cost',
     ];
 
     /* =====================

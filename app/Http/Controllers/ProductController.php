@@ -18,26 +18,80 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with(['category', 'media']); // FIX: Eager load to prevent N+1 queries
+        $query = Product::query()
+            ->with(['category', 'media'])
+            ->select('products.*')
 
+            // ===== Does product have variants? =====
+            ->selectSub(function ($q) {
+                $q->from('product_variants')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('product_variants.product_id', 'products.id')
+                    ->where('product_variants.is_active', true);
+            }, 'variant_count')
+
+            // ===== Product-level purchased qty (NO variant) =====
+            ->selectSub(function ($q) {
+                $q->from('purchase_items')
+                    ->selectRaw('COALESCE(SUM(qty), 0)')
+                    ->whereColumn('purchase_items.product_id', 'products.id')
+                    ->whereNull('purchase_items.product_variant_id');
+            }, 'product_purchased_qty')
+
+            // ===== Product-level sold qty (NO variant) =====
+            ->selectSub(function ($q) {
+                $q->from('sale_items')
+                    ->selectRaw('COALESCE(SUM(qty), 0)')
+                    ->whereColumn('sale_items.product_id', 'products.id')
+                    ->whereNull('sale_items.product_variant_id');
+            }, 'product_sold_qty')
+
+            // ===== Variant purchased qty =====
+            ->selectSub(function ($q) {
+                $q->from('purchase_items')
+                    ->join('product_variants', 'product_variants.id', '=', 'purchase_items.product_variant_id')
+                    ->selectRaw('COALESCE(SUM(purchase_items.qty), 0)')
+                    ->whereColumn('product_variants.product_id', 'products.id');
+            }, 'variant_purchased_qty')
+
+            // ===== Variant sold qty =====
+            ->selectSub(function ($q) {
+                $q->from('sale_items')
+                    ->join('product_variants', 'product_variants.id', '=', 'sale_items.product_variant_id')
+                    ->selectRaw('COALESCE(SUM(sale_items.qty), 0)')
+                    ->whereColumn('product_variants.product_id', 'products.id');
+            }, 'variant_sold_qty');
+
+        // ===== Search =====
         if ($search = $request->input('search')) {
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%"); // FIX: Usually users want to search description too
+            $query->where(function ($q) use ($search) {
+                $q->where('products.name', 'like', "%{$search}%")
+                ->orWhere('products.description', 'like', "%{$search}%");
             });
         }
 
+        // ===== Sorting =====
         $sort = $request->input('sort', 'id');
         $direction = $request->input('direction', 'desc');
 
-        // Security: Ensure sort column actually exists to prevent SQL injection attempts
-        if (in_array($sort, ['id', 'name', 'price', 'stock', 'created_at'])) {
-            $query->orderBy($sort, $direction);
+        if (in_array($sort, ['id', 'name', 'price', 'created_at'])) {
+            $query->orderBy("products.$sort", $direction);
+        } elseif ($sort === 'stock') {
+            $query->orderByRaw("
+                CASE
+                    WHEN variant_count > 0
+                    THEN (variant_purchased_qty - variant_sold_qty)
+                    ELSE (product_purchased_qty - product_sold_qty)
+                END {$direction}
+            ");
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('products.id', 'desc');
         }
 
-        $products = $query->paginate($request->input('per_page', 10))->withQueryString();
+        // ===== Pagination =====
+        $products = $query
+            ->paginate($request->input('per_page', 10))
+            ->withQueryString();
 
         return inertia('products/Index', [
             'products' => [
@@ -51,7 +105,12 @@ class ProductController extends Controller
                     'links' => $products->linkCollection(),
                 ],
             ],
-            'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
+            'filters' => $request->only([
+                'search',
+                'sort',
+                'direction',
+                'per_page',
+            ]),
         ]);
     }
 

@@ -18,7 +18,8 @@ class ProductVariant extends Model implements HasMedia
         'is_active',
         'discount_price',
     ];
-
+    protected $appends = ['stock'];
+    
     protected $casts = [
         'price' => 'decimal:2',
         'discount_price' => 'decimal:2',
@@ -35,4 +36,23 @@ class ProductVariant extends Model implements HasMedia
     {
         return $this->hasMany(ProductVariantValue::class);
     }
+
+    public function purchaseItems()
+    {
+        return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function saleItems()
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+
+    public function getStockAttribute()
+    {
+        $purchased = $this->purchaseItems()->sum('qty');
+        $sold = $this->saleItems()->sum('qty');
+
+        return $purchased - $sold;
+    }
+
 }

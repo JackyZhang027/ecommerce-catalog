@@ -90,6 +90,7 @@ export default function PurchaseForm({
                 className="w-full border rounded-md h-10 px-3"
                 value={data.supplier_id}
                 onChange={(e) => setData("supplier_id", e.target.value)}
+                required
               >
                 <option value="">Select supplier</option>
                 {suppliers.map((s) => (
