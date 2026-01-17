@@ -23,7 +23,7 @@ class Product extends Model implements HasMedia
         'has_variant',
         'is_active',
     ];
-    protected $appends = ['stock', 'sell_price', 'first_image_url'];
+    protected $appends = ['stock', 'selling_price', 'first_image_url'];
 
     protected static function booted()
     {
