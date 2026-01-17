@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Illuminate\Support\Facades\Cache;
 use App\Models\ProductCategory;
 
 class Product extends Model implements HasMedia
@@ -27,15 +28,26 @@ class Product extends Model implements HasMedia
 
     protected static function booted()
     {
-        static::creating(function ($product) {
-            $product->slug = \Str::slug($product->name);
-        });
-
-        static::updating(function ($product) {
-            if ($product->isDirty('name')) {
+        static::saving(function ($product) {
+            if (! $product->exists || $product->isDirty('name')) {
                 $product->slug = \Str::slug($product->name);
             }
         });
+        static::saved(function ($product) {
+            Cache::forget('shop:home:latest_products');
+            Cache::forget('shop:home:categories');
+            Cache::forget("product:detail:{$product->slug}");
+            Cache::flush();
+        });
+
+        static::saved(function ($product) {
+            Cache::forget('shop:home:latest_products');
+            Cache::forget('shop:home:categories');
+            Cache::forget("product:detail:{$product->slug}");
+            Cache::flush();
+
+        });
+
     }
 
     public function category()

@@ -8,6 +8,7 @@ use App\Models\Product;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Illuminate\Support\Facades\Cache;
 
 class ProductCategory extends Model implements HasMedia
 {
@@ -30,38 +31,39 @@ class ProductCategory extends Model implements HasMedia
         'is_active' => 'boolean',
     ];
 
-    protected static function boot()
+    protected static function booted()
     {
-        parent::boot();
+        static::saving(function ($category) {
 
-        static::creating(function ($category) {
-            // ✅ generate slug from name
-            $category->slug = Str::slug($category->name);
+            if (! $category->exists || $category->isDirty('name')) {
 
-            // ensure uniqueness
-            $originalSlug = $category->category;
-            $counter = 1;
-
-            while (static::where('slug', $category->slug)->exists()) {
-                $category->slug = "{$originalSlug}-{$counter}";
-                $counter++;
-            }
-        });
-
-        static::updating(function ($category) {
-            // only regenerate slug if name changed
-            if ($category->isDirty('name')) {
-                $category->slug = Str::slug($category->name);
-                $originalSlug = $category->slug;
+                $baseSlug = Str::slug($category->name);
+                $slug = $baseSlug;
                 $counter = 1;
 
-                while (static::where('slug', $category->slug)->where('id', '!=', $category->id)->exists()) {
-                    $category->slug = "{$originalSlug}-{$counter}";
+                while (
+                    static::where('slug', $slug)
+                        ->when($category->exists, fn ($q) => $q->where('id', '!=', $category->id))
+                        ->exists()
+                ) {
+                    $slug = "{$baseSlug}-{$counter}";
                     $counter++;
                 }
+
+                $category->slug = $slug;
             }
         });
+        
+        static::saved(function () {
+            Cache::forget('shop:home:categories');
+        });
+
+        static::deleted(function () {
+            Cache::forget('shop:home:categories');
+        });
+
     }
+
 
     public function parent()
     {

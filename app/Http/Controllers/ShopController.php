@@ -14,63 +14,93 @@ class ShopController extends Controller
 {
     public function index()
     {
-        $slides = Banner::where('is_active', true)->with('media')->orderBy('order')->get();
-        return inertia('shop/Index', [
-            'heroes' => $slides->map(fn($slide) => [
-                'id' => $slide->id,
-                'title' => $slide->title,
-                'subtitle' => $slide->subtitle,
-                'image' => $slide->getFirstMediaUrl('banner_image'),
-                'button_text' => $slide->button_text,
-                'button_link' => $slide->button_link,
-            ]),
-            'latest_products' => Product::latest()
-                ->take(5)
+        $heroes = Cache::remember('shop:home:heroes', now()->addHours(6), function () {
+            return Banner::where('is_active', true)
+                ->with('media')
+                ->orderBy('order')
                 ->get()
-                ->map(fn($product) => [
+                ->map(fn ($slide) => [
+                    'id' => $slide->id,
+                    'title' => $slide->title,
+                    'subtitle' => $slide->subtitle,
+                    'image' => $slide->getFirstMediaUrl('banner_image'),
+                    'button_text' => $slide->button_text,
+                    'button_link' => $slide->button_link,
+                ]);
+        });
+
+        $latestProducts = Cache::remember('shop:home:latest_products', now()->addMinutes(30), function () {
+            return Product::where('is_active', true)
+                ->latest()
+                ->take(5)
+                ->with('media')
+                ->get()
+                ->map(fn ($product) => [
                     'id' => $product->id,
                     'name' => $product->name,
                     'slug' => $product->slug,
                     'price' => (float) $product->price,
                     'discount_price' => $product->discount_price ? (float) $product->discount_price : null,
                     'image' => $product->getFirstMediaUrl('images'),
-                ]),
-            'categories' => ProductCategory::withCount('products')
+                ]);
+        });
+
+        $categories = Cache::remember('shop:home:categories', now()->addHours(12), function () {
+            return ProductCategory::where('is_active', true)
+                ->withCount('products')
+                ->with('media')
                 ->get()
-                ->map(fn($category) => [
+                ->map(fn ($category) => [
                     'id' => $category->id,
                     'slug' => $category->slug,
                     'name' => $category->name,
                     'image' => $category->getFirstMediaUrl('category_image'),
                     'product_count' => $category->products_count,
-                ]),
+                ]);
+        });
+
+        return inertia('shop/Index', [
+            'heroes' => $heroes,
+            'latest_products' => $latestProducts,
+            'categories' => $categories,
         ]);
     }
 
     public function shop(Request $request)
     {
-        $query = Product::query()->with(['category', 'media'])->where('is_active', true);
-        // Filters
-        if ($request->search) {
-            $query->where('name', 'like', "%{$request->search}%");
-        }
+        $cacheKey = 'shop:list:' . md5(json_encode($request->only([
+            'search', 'category', 'sort', 'page'
+        ])));
 
-        if ($request->category) {
-            $query->where('category_id', $request->category);
-        }
+        $data = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($request) {
 
-        if ($request->sort === 'low') {
-            $query->orderBy('price', 'asc');
-        } elseif ($request->sort === 'high') {
-            $query->orderBy('price', 'desc');
-        }
+            $query = Product::query()
+                ->where('is_active', true)
+                ->with(['category', 'media']);
 
-        $products = $query->paginate(15)->withQueryString();
-        $categories = ProductCategory::where('is_active', true)->get();
+            if ($request->search) {
+                $query->where('name', 'like', "%{$request->search}%");
+            }
+
+            if ($request->category) {
+                $query->where('category_id', $request->category);
+            }
+
+            if ($request->sort === 'low') {
+                $query->orderBy('price', 'asc');
+            } elseif ($request->sort === 'high') {
+                $query->orderBy('price', 'desc');
+            }
+
+            return [
+                'products' => $query->paginate(15)->withQueryString(),
+                'categories' => ProductCategory::where('is_active', true)->get(),
+            ];
+        });
 
         return Inertia::render('shop/Shop', [
-            'products' => $products,
-            'categories' => $categories,
+            'products' => $data['products'],
+            'categories' => $data['categories'],
             'filters' => [
                 'search' => $request->get('search', ''),
                 'category' => $request->get('category', ''),
@@ -78,52 +108,47 @@ class ShopController extends Controller
                 'page' => $request->get('page', ''),
             ],
         ]);
-
     }
+
 
     public function show($slug)
     {
-        // Cache key unique for each product slug
-        $cacheKey = "product_detail_{$slug}";
+        $cacheKey = "product:detail:{$slug}";
 
-        // Cache for 24 hour
-        $product = Cache::remember($cacheKey, 60*60*24, function () use ($slug) {
+        $product = Cache::remember($cacheKey, now()->addHours(6), function () use ($slug) {
+            $product = Product::where('slug', $slug)
+                ->where('is_active', true)
+                ->with([
+                    'category:id,name,slug',
+                    'media',
+                    'variants.media',
+                    'variants.variantValues.attributeValue',
+                ])
+                ->firstOrFail();
 
-            $product = Product::with([
-                'category',
-                'media', 
-                'variants.media', 
-                'variants.variantValues.attribute',
-                'variants.variantValues.attributeValue',
-            ])->where('slug', $slug)->firstOrFail();
-            
-            // Media mapping helper
-            $mapMedia = function ($mediaItem) {
-                $type = str_starts_with($mediaItem->mime_type, 'video/') ? 'video' : 'image';
-                return [
-                    'url' => $mediaItem->original_url,
-                    'type' => $type,
-                ];
-            };
+            $mapMedia = fn ($media) => [
+                'url' => $media->original_url,
+                'type' => str_starts_with($media->mime_type, 'video/') ? 'video' : 'image',
+            ];
 
-            // Build variant label & map media
-            $product->variants->transform(function ($variant) use ($mapMedia) {
-                $labelParts = [];
-
-                foreach ($variant->variantValues as $vv) {
-                    $labelParts[] = $vv->attributeValue->value;
-                }
-
-                $variant->label = implode(' ', $labelParts);
-                $variant->images = $variant->media->map($mapMedia);
-
-                return $variant;
-            });
-
-            // Map product images
-            $product->images = $product->media->map($mapMedia);
-
-            return $product;
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'slug' => $product->slug,
+                'price' => (float) $product->price,
+                'description' => $product->description,
+                'category' => $product->category,
+                'images' => $product->media->map($mapMedia),
+                'variants' => $product->variants->map(function ($variant) use ($mapMedia) {
+                    return [
+                        'id' => $variant->id,
+                        'label' => $variant->variantValues
+                            ->pluck('attributeValue.value')
+                            ->implode(' '),
+                        'images' => $variant->media->map($mapMedia),
+                    ];
+                }),
+            ];
         });
 
         return Inertia::render('shop/ProductDetail', [
@@ -134,20 +159,20 @@ class ShopController extends Controller
 
     public function category($slug)
     {
-        $category = ProductCategory::where('slug', $slug)->firstOrFail();
+        $cacheKey = "category:{$slug}:page:" . request('page', 1);
 
-        $products = Product::where('category_id', $category->id)
-            ->where('is_active', true)
-            ->with('media')
-            ->paginate(12);
+        $data = Cache::remember($cacheKey, now()->addMinutes(15), function () use ($slug) {
+            $category = ProductCategory::where('slug', $slug)->firstOrFail();
 
-        $shared = \App\Helpers\EcommerceHelper::sharedData();
+            return [
+                'category' => $category,
+                'products' => Product::where('category_id', $category->id)
+                    ->where('is_active', true)
+                    ->with('media')
+                    ->paginate(12),
+            ];
+        });
 
-        return Inertia::render('shop/Category', array_merge($shared, [
-            'category' => $category,
-            'products' => $products,
-        ]));
+        return Inertia::render('shop/Category', $data);
     }
-
-
 }

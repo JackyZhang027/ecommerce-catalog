@@ -252,7 +252,6 @@ class ProductController extends Controller
                     'name' => $data['name'],
                     'sku' => $data['sku'],
                     'price' => $data['price'],
-                    'stock' => $data['stock'],
                     'is_active' => $data['is_active'] ?? true,
                 ]
             );
@@ -345,7 +344,6 @@ class ProductController extends Controller
             'category_id' => ['required', 'exists:product_categories,id'],
             'description' => ['required', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
-            'stock' => ['nullable', 'numeric', 'min:0'],
             'has_variant' => ['required', 'boolean'],
             'images.*' => $mediaRules,
         ];
@@ -355,7 +353,6 @@ class ProductController extends Controller
                 'variants' => ['required', 'array', 'min:1'],
                 'variants.*.name' => ['required', 'string', 'max:255'],
                 'variants.*.price' => ['required', 'numeric', 'min:0'],
-                'variants.*.stock' => ['required', 'numeric', 'min:0'],
                 'variants.*.attributes' => ['required', 'array', 'min:1'],
                 'variants.*.attributes.*' => ['required', 'integer', 'exists:attribute_values,id'],
 
@@ -381,7 +378,6 @@ class ProductController extends Controller
             'variants.*.name' => 'variant name',
             'variants.*.sku' => 'variant SKU',
             'variants.*.price' => 'variant price',
-            'variants.*.stock' => 'variant stock',
             'variants.*.attributes' => 'attributes',
             'images.*' => 'image'
         ];
