@@ -146,6 +146,7 @@ class ShopController extends Controller
                             ->pluck('attributeValue.value')
                             ->implode(' '),
                         'images' => $variant->media->map($mapMedia),
+                        'price' => (float) $variant->price,
                     ];
                 }),
             ];
