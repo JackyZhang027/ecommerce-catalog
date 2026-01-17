@@ -4,7 +4,12 @@ import AppLayout from "@/layouts/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
 import { Plus, Trash, AlertCircle } from "lucide-react";
 import { ProductSelect } from "@/components/ecommerce/ProductSelect";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -49,6 +54,10 @@ export default function PurchaseForm({
       ],
   });
 
+  /* =====================
+     HELPERS
+  ===================== */
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     isEdit
@@ -61,6 +70,31 @@ export default function PurchaseForm({
     items[index] = { ...items[index], ...newData };
     setData("items", items);
   };
+
+  const addItem = () => {
+    setData("items", [
+      ...data.items,
+      {
+        product_id: null,
+        product_variant_id: null,
+        label: "",
+        qty: 1,
+        cost: 0,
+      },
+    ]);
+  };
+
+  const removeItem = (index: number) => {
+    if (data.items.length === 1) return;
+    setData(
+      "items",
+      data.items.filter((_, i) => i !== index)
+    );
+  };
+
+  /* =====================
+     RENDER
+  ===================== */
 
   return (
     <AppLayout title={isEdit ? "Edit Purchase" : "Create Purchase"}>
@@ -78,6 +112,9 @@ export default function PurchaseForm({
           </Alert>
         )}
 
+        {/* =====================
+            PURCHASE INFO
+        ===================== */}
         <Card>
           <CardHeader>
             <CardTitle>Purchase Information</CardTitle>
@@ -87,7 +124,7 @@ export default function PurchaseForm({
               <Label>Supplier</Label>
               <select
                 disabled={hasSales}
-                className="w-full border rounded-md h-10 px-3"
+                className="w-full border rounded-md h-10 px-3 dark:bg-gray-800 dark:border-gray-700"
                 value={data.supplier_id}
                 onChange={(e) => setData("supplier_id", e.target.value)}
                 required
@@ -122,76 +159,117 @@ export default function PurchaseForm({
           </CardContent>
         </Card>
 
+        {/* =====================
+            ITEMS
+        ===================== */}
         <Card>
-          <CardHeader>
-            <CardTitle>Items</CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            {data.items.map((item, index) => (
-              <div key={index} className="grid md:grid-cols-12 gap-3">
-                <div className="md:col-span-5">
-                  <ProductSelect
-                    disabled={hasSales}
-                    products={products}
-                    value={{
-                        product_id: item.product_id,
-                        variant_id: item.product_variant_id,
-                    }}
-                    onSelect={(p) =>
-                        updateItem(index, {
-                        product_id: p.product_id,
-                        product_variant_id: p.variant_id,
-                        label: p.label,
-                        })
-                    }
-                    />
-
-                </div>
-
-                <div className="md:col-span-2">
-                  <Input
-                    disabled={hasSales}
-                    type="number"
-                    value={item.qty}
-                    onChange={(e) =>
-                      updateItem(index, { qty: Number(e.target.value) })
-                    }
-                  />
-                </div>
-
-                <div className="md:col-span-3">
-                  <Input
-                    disabled={hasSales}
-                    type="number"
-                    value={item.cost}
-                    onChange={(e) =>
-                      updateItem(index, { cost: Number(e.target.value) })
-                    }
-                  />
-                </div>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Items</CardTitle>
 
                 {!hasSales && (
-                  <div className="md:col-span-2">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() =>
-                        setData(
-                          "items",
-                          data.items.filter((_, i) => i !== index)
-                        )
-                      }
-                    >
-                      <Trash className="w-4 h-4" />
-                    </Button>
-                  </div>
+                <Button type="button" size="sm" onClick={addItem}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Item
+                </Button>
                 )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+            </CardHeader>
 
+            <CardContent className="space-y-3">
+                {/* Table header (desktop only) */}
+                <div className="hidden md:grid grid-cols-12 gap-3 px-4 text-sm text-muted-foreground">
+                <div className="col-span-5">Product</div>
+                <div className="col-span-2">Qty</div>
+                <div className="col-span-3">Cost</div>
+                <div className="col-span-1 text-right">Subtotal</div>
+                <div className="col-span-1"></div>
+                </div>
+
+                {data.items.map((item, index) => {
+                const subtotal = item.qty * item.cost;
+
+                return (
+                    <div
+                    key={index}
+                    className="grid grid-cols-12 gap-3 items-center rounded-xl border p-4 shadow-sm"
+                    >
+                    {/* Product */}
+                    <div className="col-span-12 md:col-span-5">
+                        <ProductSelect
+                            disabled={hasSales}
+                            products={products}
+                            value={{
+                                product_id: item.product_id,
+                                variant_id: item.product_variant_id,
+                            }}
+                            onSelect={(p) =>
+                                updateItem(index, {
+                                product_id: p.product_id,
+                                product_variant_id: p.variant_id,
+                                label: p.label,
+                                })
+                            }
+                        />
+                    </div>
+
+                    {/* Qty */}
+                    <div className="col-span-4 md:col-span-2">
+                        <Input
+                        disabled={hasSales}
+                        type="number"
+                        min={1}
+                        value={item.qty}
+                        onChange={(e) =>
+                            updateItem(index, {
+                            qty: Number(e.target.value),
+                            })
+                        }
+                        />
+                    </div>
+
+                    {/* Cost */}
+                    <div className="col-span-4 md:col-span-3">
+                        <Input
+                        disabled={hasSales}
+                        type="number"
+                        min={0}
+                        value={item.cost}
+                        onChange={(e) =>
+                            updateItem(index, {
+                            cost: Number(e.target.value),
+                            })
+                        }
+                        />
+                    </div>
+
+                    {/* Subtotal */}
+                    <div className="col-span-3 md:col-span-1 text-right font-semibold">
+                        Rp {subtotal.toLocaleString("id-ID")}
+                    </div>
+
+                    {/* Remove */}
+                    {!hasSales && (
+                        <div className="col-span-1 flex justify-end">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={data.items.length === 1}
+                            onClick={() => removeItem(index)}
+                        >
+                            <Trash className="w-4 h-4 text-destructive" />
+                        </Button>
+                        </div>
+                    )}
+                    </div>
+                );
+                })}
+            </CardContent>
+            </Card>
+
+
+        {/* =====================
+            ACTIONS
+        ===================== */}
         <div className="flex justify-end gap-2">
           <Button
             type="button"

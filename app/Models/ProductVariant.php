@@ -18,7 +18,7 @@ class ProductVariant extends Model implements HasMedia
         'is_active',
         'discount_price',
     ];
-    protected $appends = ['stock'];
+    protected $appends = ['stock', 'selling_price'];
     
     protected $casts = [
         'price' => 'decimal:2',
@@ -45,6 +45,13 @@ class ProductVariant extends Model implements HasMedia
     public function saleItems()
     {
         return $this->hasMany(SaleItem::class);
+    }
+
+    public function getSellingPriceAttribute(): float
+    {
+        return $this->discount_price !== null
+            ? (float) $this->discount_price
+            : (float) $this->price;
     }
 
     public function getStockAttribute()

@@ -240,35 +240,50 @@ class SaleController extends Controller
             'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ]);
     }
+    
     public function productOptions()
     {
-        return Product::with('variants')
+        return Product::with(['variants' => function ($q) {
+                $q->where('is_active', true);
+            }])
             ->where('is_active', true)
             ->get()
             ->flatMap(function ($product) {
 
-                // Product WITHOUT variants
-                if ($product->variants->isEmpty()) {
+                // PRODUCT WITHOUT VARIANTS
+                if (!$product->has_variant) {
                     return [[
                         'id' => 'p-' . $product->id,
-                        'label' => $product->name, // ✅ REQUIRED
+                        'label' => $product->name,
                         'product_id' => $product->id,
                         'variant_id' => null,
+                        'price' => $product->selling_price, // ✅
                     ]];
                 }
 
-                // Product WITH variants
-                return $product->variants
-                    ->where('is_active', true)
-                    ->map(function ($variant) use ($product) {
-                        return [
-                            'id' => 'v-' . $variant->id,
-                            'label' => $product->name . ' — ' . $variant->name, // ✅ REQUIRED
-                            'product_id' => $product->id,
-                            'variant_id' => $variant->id,
-                        ];
-                    });
+                // PRODUCT WITH VARIANTS
+                return $product->variants->map(function ($variant) use ($product) {
+                    return [
+                        'id' => 'v-' . $variant->id,
+                        'label' => $product->name . ' — ' . $variant->name,
+                        'product_id' => $product->id,
+                        'variant_id' => $variant->id,
+                        'price' => $variant->selling_price, // ✅
+                    ];
+                });
             })
             ->values();
     }
+
+
+    function sellingPrice($item): float
+    {
+        if ($item instanceof \App\Models\ProductVariant) {
+            return $item->selling_price;
+        }
+
+        return $item->selling_price;
+    }
+
+
 }

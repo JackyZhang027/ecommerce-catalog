@@ -6,6 +6,7 @@ interface ProductOption {
   product_id: number;
   variant_id: number | null;
   label: string;
+  price?: number;
 }
 
 interface Props {
@@ -16,6 +17,9 @@ interface Props {
   };
   onSelect: (p: ProductOption) => void;
   disabled?: boolean;
+
+  /** OPTIONAL */
+  showPrice?: boolean;
 }
 
 export function ProductSelect({
@@ -23,6 +27,7 @@ export function ProductSelect({
   value,
   onSelect,
   disabled = false,
+  showPrice = false,
 }: Props) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -58,32 +63,45 @@ export function ProductSelect({
       />
 
       {open && !disabled && (
-        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-md border bg-white shadow">
+        <div className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-md border bg-background text-foreground shadow">
           {filtered.length === 0 && (
             <div className="p-2 text-sm text-muted-foreground">
               No products found
             </div>
           )}
 
-          {filtered.map((p, idx) => (
-            <div
-              key={idx}
-              className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-muted"
-              onMouseDown={() => {
-                onSelect(p);
-                setSearch("");
-                setOpen(false);
-              }}
-            >
-              <span>{p.label}</span>
+          {filtered.map((p, idx) => {
+            const isSelected =
+              selected &&
+              selected.product_id === p.product_id &&
+              selected.variant_id === p.variant_id;
 
-              {selected &&
-                selected.product_id === p.product_id &&
-                selected.variant_id === p.variant_id && (
-                  <Check className="h-4 w-4 text-green-600" />
+            return (
+              <div
+                key={idx}
+                className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                onMouseDown={() => {
+                  onSelect(p);
+                  setSearch("");
+                  setOpen(false);
+                }}
+              >
+                <div className="flex flex-col">
+                  <span>{p.label}</span>
+
+                  {showPrice && p.price !== undefined && (
+                    <span className="text-xs text-muted-foreground">
+                      Rp {p.price.toLocaleString("id-ID")}
+                    </span>
+                  )}
+                </div>
+
+                {isSelected && (
+                  <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                 )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -212,13 +212,16 @@ export default function SalesForm({ products, sale }: Props) {
                         product_id: item.product_id,
                         variant_id: item.product_variant_id,
                       }}
+                      showPrice={true}
                       onSelect={(p) =>
                         updateItem(index, {
-                          product_id: p.product_id,
-                          product_variant_id: p.variant_id,
-                          label: p.label,
+                            product_id: p.product_id,
+                            product_variant_id: p.variant_id,
+                            label: p.label,
+                            price: p.price, // 🔥 AUTO PRICE
                         })
-                      }
+                    }
+
                     />
                   </div>
 

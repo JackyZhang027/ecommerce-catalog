@@ -23,7 +23,7 @@ class Product extends Model implements HasMedia
         'has_variant',
         'is_active',
     ];
-    protected $appends = ['stock'];
+    protected $appends = ['stock', 'sell_price', 'first_image_url'];
 
     protected static function booted()
     {
@@ -69,6 +69,10 @@ class Product extends Model implements HasMedia
              - ($this->product_sold_qty ?? 0);
     }
 
+    public function getSellingPriceAttribute(): float
+    {
+        return (float) $this->price;
+    }
 
     public function getFirstImageUrlAttribute()
     {
